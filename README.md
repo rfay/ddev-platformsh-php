@@ -1,15 +1,15 @@
 [![add-on registry](https://img.shields.io/badge/DDEV-Add--on_Registry-blue)](https://addons.ddev.com)
-[![tests](https://github.com/ddev/ddev-platformsh/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddev/ddev-platformsh/actions/workflows/tests.yml?query=branch%3Amain)
-[![last commit](https://img.shields.io/github/last-commit/ddev/ddev-platformsh)](https://github.com/ddev/ddev-platformsh/commits)
-[![release](https://img.shields.io/github/v/release/ddev/ddev-platformsh)](https://github.com/ddev/ddev-platformsh/releases/latest)
+[![tests](https://github.com/ddev/ddev-platformsh-php/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddev/ddev-platformsh-php/actions/workflows/tests.yml?query=branch%3Amain)
+[![last commit](https://img.shields.io/github/last-commit/ddev/ddev-platformsh-php)](https://github.com/ddev/ddev-platformsh-php/commits)
+[![release](https://img.shields.io/github/v/release/ddev/ddev-platformsh-php)](https://github.com/ddev/ddev-platformsh-php/releases/latest)
 
-# DDEV Platform.sh
+# Experimental PHP version of ddev-platformsh, look the other way
 
 ## Overview
 
 [Platform.sh](https://platform.sh/) is a unified, secure, enterprise-grade platform for building, running and scaling web applications.
 
-This repository is used with `ddev add-on get ddev/ddev-platformsh` to get a rich integration between your checked-out Platform.sh project and [DDEV](https://ddev.com).
+This repository is used with `ddev add-on get ddev/ddev-platformsh-php` to get a rich integration between your checked-out Platform.sh project and [DDEV](https://ddev.com).
 
 ## Using with a Platform.sh project
 
@@ -21,17 +21,17 @@ Make sure you have [DDEV v1.24.3+ installed](https://ddev.readthedocs.io/en/stab
 1. Clone your project repository (e.g. `platform get <projectid>`)
 2. `cd` into your project directory
 3. Run `ddev config` and answer the questions as appropriate
-4. Run `ddev add-on get ddev/ddev-platformsh` and answer the questions as appropriate
+4. Run `ddev add-on get ddev/ddev-platformsh-php` and answer the questions as appropriate
 5. Run `ddev start`
 6. (Optional) Run `ddev pull platform` to retrieve a copy of the database and contents from the project's file mounts from the environment you entered in step #5. (If you only want to retrieve the database (skipping the file mounts), add the `--skip-files` flag to the `ddev pull platform` command.)
 
 ### Upgrade
 
-To upgrade your version of ddev-platformsh, repeat the `ddev add-on get ddev/ddev-platformsh` to get the latest release. To see the installed version, `ddev add-on list --installed`.
+To upgrade your version of ddev-platformsh-php, repeat the `ddev add-on get ddev/ddev-platformsh-php` to get the latest release. To see the installed version, `ddev add-on list --installed`.
 
 ### Run it again if you change your Platform.sh configuration
 
-If you change your `.platform.app.yaml` or something in your `.platform` directory, repeat the `ddev add-on get ddev/ddev-platformsh` so that the generated configuration for DDEV will be updated.
+If you change your `.platform.app.yaml` or something in your `.platform` directory, repeat the `ddev add-on get ddev/ddev-platformsh-php` so that the generated configuration for DDEV will be updated.
 
 ## Notes
 
