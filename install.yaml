@@ -4,10 +4,10 @@ name: ddev-platformsh
 #ddev_version_constraint: '>= v1.24.3'
 
 project_files:
-  - platformsh/parse-platformsh-config.php
-  - platformsh/generate-ddev-config.php
-  - platformsh/generate-platform-relationships.php
-  - platformsh/setup-platformsh-configuration.php
+  - scripts/parse-platformsh-config.php
+  - scripts/generate-ddev-config.php
+  - scripts/generate-platform-relationships.php
+  - scripts/setup-platformsh-configuration.php
   - web-build/Dockerfile.platformsh
   - homeadditions/.bashrc.d/platformsh-environment.sh
 
@@ -26,7 +26,7 @@ pre_install_actions:
     // Test PHP YAML extension availability
     if (!extension_loaded('yaml')) {
         echo "❌ PHP YAML extension not available\n";
-        return 1;
+        exit(1);
     }
     echo "✅ PHP YAML extension is available\n";
     
@@ -45,4 +45,4 @@ post_install_actions:
   - |
     <?php
     #ddev-description: Setup Platform.sh configuration for DDEV
-    require 'platformsh/setup-platformsh-configuration.php';
+    require 'scripts/setup-platformsh-configuration.php';
