@@ -19,11 +19,20 @@ echo "Working directory: " . getcwd() . "\n";
 
 // Check if Platform.sh configuration exists
 if (!file_exists('../.platform.app.yaml')) {
-    echo "✅ No Platform.sh configuration found - installation successful for template mode\n";
+    echo "⚠️  No Platform.sh configuration found - running in template mode\n";
+    
+    // Generate basic environment variables even without Platform.sh config
+    // This supports WordPress tests that expect basic DB environment variables
+    generate_basic_environment_file();
+    
+    echo "✅ Basic environment configuration generated for template mode\n";
     exit(0);
 }
 
 echo "📝 Found Platform.sh configuration files\n";
+
+// Check for database mismatch before generating config
+check_database_mismatch();
 
 // Generate DDEV configuration from Platform.sh files
 $result = generate_all_ddev_config();

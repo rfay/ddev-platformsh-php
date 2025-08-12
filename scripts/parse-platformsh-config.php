@@ -64,9 +64,15 @@ function extract_database_services($services) {
             $type = $serviceConfig['type'];
             
             // Check for database types
-            if (strpos($type, 'mysql') !== false || strpos($type, 'mariadb') !== false) {
+            if (strpos($type, 'mysql') !== false || strpos($type, 'mariadb') !== false || strpos($type, 'oracle-mysql') !== false) {
+                // oracle-mysql maps to mysql (not mariadb) for DDEV
+                $dbType = (strpos($type, 'oracle-mysql') !== false) ? 'mysql' : 'mysql';
+                if (strpos($type, 'mariadb') !== false) {
+                    $dbType = 'mariadb';
+                }
+                
                 $databases[$serviceName] = [
-                    'type' => 'mysql',
+                    'type' => $dbType,
                     'version' => extract_version_from_type($type),
                     'disk' => $serviceConfig['disk'] ?? 1024
                 ];
@@ -183,6 +189,53 @@ function extract_relationships($appConfig) {
     }
     
     return $relationships;
+}
+
+function check_database_mismatch() {
+    // Parse current DDEV configuration
+    $ddevConfigFile = 'config.yaml';
+    if (!file_exists($ddevConfigFile)) {
+        return; // No existing DDEV config to check against
+    }
+    
+    $ddevConfig = yaml_parse_file($ddevConfigFile);
+    if (!$ddevConfig || !isset($ddevConfig['database'])) {
+        return; // No database configuration in DDEV
+    }
+    
+    $currentDdevDb = $ddevConfig['database'];
+    $currentDbType = $currentDdevDb['type'] ?? 'mariadb';
+    $currentDbVersion = $currentDdevDb['version'] ?? '10.4';
+    
+    // Parse Platform.sh configuration
+    $services = parse_platformsh_services_config();
+    $databases = extract_database_services($services);
+    
+    if (empty($databases)) {
+        return; // No Platform.sh database to check against
+    }
+    
+    // Get primary database from Platform.sh
+    $primaryDb = array_values($databases)[0];
+    $platformDbType = $primaryDb['type']; // This is already normalized to 'mysql' or 'postgres'
+    $platformDbVersion = $primaryDb['version'];
+    
+    // Keep database types as-is for comparison - DDEV supports both mysql and mariadb
+    $expectedDbType = $platformDbType;
+    
+    // Check for mismatch
+    $typeMismatch = ($currentDbType !== $expectedDbType);
+    $versionMismatch = ($currentDbVersion !== $platformDbVersion);
+    
+    if ($typeMismatch || $versionMismatch) {
+        echo "⚠️  Database mismatch detected!\n";
+        echo "DDEV current: {$currentDbType}:{$currentDbVersion}\n";
+        echo "Platform.sh requires: {$expectedDbType}:{$platformDbVersion}\n";
+        echo "There is an existing database in this project\n";
+        echo "Please run 'ddev delete' and reconfigure, or adjust your Platform.sh configuration\n";
+        // Don't exit(1) here - let the user decide whether to continue
+        // exit(1);
+    }
 }
 
 // Utility function to print parsed configuration for debugging

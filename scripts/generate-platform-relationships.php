@@ -12,11 +12,8 @@ function generate_database_relationship($serviceName, $dbType, $relationshipName
     $port = 3306;
     $rel = 'mysql';
     
-    // Convert Platform.sh mysql to mariadb for DDEV compatibility
+    // Keep database type as-is for relationships - don't convert mysql to mariadb
     $ddevDbType = $dbType;
-    if (strpos($dbType, 'mysql:') === 0) {
-        $ddevDbType = str_replace('mysql:', 'mariadb:', $dbType);
-    }
     
     if (strpos($dbType, 'postgres') === 0) {
         $scheme = 'pgsql';
@@ -195,6 +192,59 @@ function generate_platform_routes() {
     return $base64Routes;
 }
 
+function generate_basic_environment_file() {
+    // Generate minimal environment file for template mode (no Platform.sh config)
+    $appRoot = $_ENV['DDEV_APPROOT'] ?? '/var/www/html';
+    $environmentFile = "{$appRoot}/.environment";
+    
+    $envContent = "#ddev-generated
+# Basic environment variables for template mode (no Platform.sh config)
+# WordPress-specific database environment variables
+export DB_HOST=\"db\"
+export DB_USER=\"db\"
+export DB_PASSWORD=\"db\"
+export DB_NAME=\"db\"
+export DB_PORT=\"3306\"
+
+# Basic Platform.sh-like environment variables
+export PLATFORM_APPLICATION_NAME=\"app\"
+export PLATFORM_ENVIRONMENT=\"main\"
+export PLATFORM_BRANCH=\"main\"
+export PLATFORM_APP_DIR=\"{$appRoot}\"
+export PLATFORM_DOCUMENT_ROOT=\"{$appRoot}/" . ($_ENV['DDEV_DOCROOT'] ?? 'web') . "\"
+export PLATFORM_CACHE_DIR=\"{$appRoot}/tmp/cache\"
+";
+    
+    file_put_contents($environmentFile, $envContent);
+    echo "Generated basic environment file for template mode: .environment\n";
+    
+    // Also generate DDEV web environment config for PHP access
+    $webEnvYaml = "#ddev-generated
+# WordPress environment variables available to PHP
+web_environment:
+  - DB_HOST=db
+  - DB_USER=db
+  - DB_PASSWORD=db
+  - DB_NAME=db
+  - DB_PORT=3306
+  - PLATFORM_APPLICATION_NAME=app
+  - PLATFORM_ENVIRONMENT=main
+  - PLATFORM_BRANCH=main
+";
+    
+    file_put_contents('config.platformsh-env.yaml', $webEnvYaml);
+    echo "Generated DDEV web environment config: config.platformsh-env.yaml\n";
+    
+    // Generate basic DDEV config for template mode to ensure proper docroot
+    $basicConfigYaml = "#ddev-generated
+# Basic DDEV config for template mode (no Platform.sh config)
+docroot: web
+";
+    
+    file_put_contents('config.platformsh-basic.yaml', $basicConfigYaml);
+    echo "Generated basic DDEV config: config.platformsh-basic.yaml\n";
+}
+
 function generate_platform_environment_file() {
     $relationships = generate_all_platform_relationships();
     $routes = generate_platform_routes();
@@ -218,9 +268,36 @@ export PLATFORM_DOCUMENT_ROOT=\"{$appRoot}/" . ($_ENV['DDEV_DOCROOT'] ?? 'web') 
 export PLATFORM_CACHE_DIR=\"{$appRoot}/tmp/cache\"
 export PLATFORM_VARIABLES=\"\"
 export PLATFORM_SMTP_HOST=\"\"
+
+# WordPress-specific database environment variables (common in Platform.sh WordPress templates)
+export DB_HOST=\"db\"
+export DB_USER=\"db\"
+export DB_PASSWORD=\"db\"
+export DB_NAME=\"db\"
+export DB_PORT=\"3306\"
 ";
     
     file_put_contents($environmentFile, $envContent);
     echo "Generated Platform.sh environment file: .environment\n";
+    
+    // Also generate DDEV web environment config for PHP access
+    $webEnvYaml = "#ddev-generated
+# Platform.sh environment variables available to PHP
+web_environment:
+  - PLATFORM_RELATIONSHIPS={$relationships}
+  - PLATFORM_ROUTES={$routes}
+  - PLATFORM_APPLICATION_NAME=app
+  - PLATFORM_ENVIRONMENT=main
+  - PLATFORM_BRANCH=main
+  - PLATFORM_PROJECT=ddev-project
+  - DB_HOST=db
+  - DB_USER=db
+  - DB_PASSWORD=db
+  - DB_NAME=db
+  - DB_PORT=3306
+";
+    
+    file_put_contents('config.platformsh-env.yaml', $webEnvYaml);
+    echo "Generated DDEV web environment config: config.platformsh-env.yaml\n";
 }
 ?>

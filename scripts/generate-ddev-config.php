@@ -19,9 +19,9 @@ function generate_ddev_database_config($databases) {
     
     // Generate database configuration for DDEV's config
     $ddevDbType = $primaryDb['type'];
-    if ($primaryDb['type'] === 'mysql') {
-        $ddevDbType = 'mariadb';
-    } elseif ($primaryDb['type'] === 'postgres') {
+    // Note: Don't auto-convert mysql to mariadb - let DDEV handle mysql directly
+    // Only convert if explicitly mariadb type
+    if ($primaryDb['type'] === 'postgres') {
         $ddevDbType = 'postgres'; // Keep postgres as-is for DDEV
     }
     $yamlContent = "#ddev-generated
@@ -74,10 +74,21 @@ services:";
                 break;
                 
             case 'elasticsearch':
+                // Map Elasticsearch versions to available Docker images
+                $esVersion = $serviceConfig['version'];
+                
+                // Use a compatible Elasticsearch version that exists in Docker Hub
+                // For 7.x versions, try to use 7.17 which should be available
+                if (version_compare($esVersion, '8.0', '<')) {
+                    $esImage = "elasticsearch:7.17.0";
+                } else {
+                    $esImage = "docker.elastic.co/elasticsearch/elasticsearch:{$esVersion}";
+                }
+                
                 $yamlContent .= "
   {$containerName}:
     container_name: ddev-\${DDEV_SITENAME}-{$containerName}
-    image: elasticsearch:{$serviceConfig['version']}
+    image: {$esImage}
     labels:
       com.ddev.site-name: \${DDEV_SITENAME}
       com.ddev.approot: \${DDEV_APPROOT}
@@ -85,6 +96,7 @@ services:";
     environment:
       - discovery.type=single-node
       - \"ES_JAVA_OPTS=-Xms512m -Xmx512m\"
+      - xpack.security.enabled=false
     expose:
       - 9200
       - 9300
@@ -166,7 +178,7 @@ function generate_ddev_dockerfile($appConfig) {
         echo "Installing PHP dependencies via Composer\n";
         $dockerfileContent .= "\n# Install PHP dependencies from Platform.sh configuration\n";
         $dockerfileContent .= "ENV COMPOSER_HOME=/usr/local/composer\n";
-        $dockerfileContent .= "RUN echo \"export PATH=\${PATH}:\${COMPOSER_HOME}/vendor/bin\" >/etc/bash/bashrc/composerpath.bashrc\n";
+        $dockerfileContent .= "RUN mkdir -p /etc/bashrc.d && echo \"export PATH=\${PATH}:\${COMPOSER_HOME}/vendor/bin\" >/etc/bashrc.d/composerpath.bashrc\n";
         
         foreach ($phpDeps as $pkg => $version) {
             if ($pkg !== 'composer/composer') {
