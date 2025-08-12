@@ -36,15 +36,7 @@ if ($result === 0) {
     // Generate Platform.sh environment variables
     generate_platform_environment_file();
     
-    // Install Composer dependencies if composer.json exists
-    if (file_exists('../composer.json')) {
-        echo "📦 Installing Composer dependencies...\n";
-        $composerOutput = shell_exec('cd .. && composer install --no-interaction --no-progress --quiet 2>&1');
-        if ($composerOutput && trim($composerOutput) !== '') {
-            echo "Composer: {$composerOutput}\n";
-        }
-        echo "✅ Composer dependencies installed\n";
-    }
+    // Note: Composer dependencies will be installed via DDEV hooks in post-start
     
     echo "✅ Platform.sh configuration successfully converted to DDEV\n";
     echo "🔄 Please run 'ddev restart' to apply the new configuration\n";

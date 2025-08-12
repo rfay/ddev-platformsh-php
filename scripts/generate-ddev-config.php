@@ -168,6 +168,7 @@ web_environment:
 hooks:
   post-start:
     - exec: mkdir -p \${PLATFORM_CACHE_DIR} || true
+    - composer: install
 ";
     
     file_put_contents('config.platformsh.yaml', $yamlContent);
