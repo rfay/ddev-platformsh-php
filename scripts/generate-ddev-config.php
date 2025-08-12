@@ -5,6 +5,7 @@
 // Following ddev-redis-php pattern: use plain text generation instead of yaml_emit()
 
 require_once 'parse-platformsh-config.php';
+require_once 'generate-platform-relationships.php';
 
 function generate_ddev_database_config($databases) {
     if (empty($databases)) {
@@ -134,12 +135,35 @@ services:";
 function generate_ddev_php_config($phpVersion, $docroot, $composerVersion = '2') {
     echo "Configuring DDEV for PHP {$phpVersion} with docroot '{$docroot}' and Composer {$composerVersion}\n";
     
+    // Generate Platform.sh environment variables
+    $relationships = generate_all_platform_relationships();
+    $routes = generate_platform_routes();
+    
     // Generate config.platformsh.yaml to override DDEV settings
     $yamlContent = "#ddev-generated
 # Platform.sh PHP configuration - overrides project settings
+disable_settings_management: true
 php_version: \"{$phpVersion}\"
 docroot: \"{$docroot}\"
 composer_version: \"{$composerVersion}\"
+webimage_extra_packages:
+  - figlet
+web_environment:
+  - \"PLATFORM_RELATIONSHIPS={$relationships}\"
+  - \"PLATFORM_ROUTES={$routes}\"
+  - \"PLATFORM_APP_DIR=/var/www/html\"
+  - \"PLATFORM_PROJECT_ENTROPY=ddev-entropy-12345\"
+  - \"PLATFORM_TREE_ID=main\"
+  - \"PLATFORM_CACHE_DIR=/mnt/ddev-global-cache/ddev-platformsh/\${DDEV_PROJECT}\"
+  - \"PLATFORM_VARIABLES=e30=\"
+  - \"PLATFORM_APPLICATION_NAME=app\"
+  - \"PLATFORM_ENVIRONMENT=main\"
+  - \"PLATFORM_BRANCH=main\"
+  - \"PLATFORM_PROJECT=ddev-project\"
+  - \"PLATFORM_DOCUMENT_ROOT=/var/www/html/{$docroot}\"
+hooks:
+  post-start:
+    - exec: mkdir -p \${PLATFORM_CACHE_DIR} || true
 ";
     
     file_put_contents('config.platformsh.yaml', $yamlContent);

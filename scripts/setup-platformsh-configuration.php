@@ -29,6 +29,10 @@ echo "📝 Found Platform.sh configuration files\n";
 $result = generate_all_ddev_config();
 
 if ($result === 0) {
+    // Install required DDEV add-ons based on services
+    $services = parse_platformsh_services_config();
+    install_required_addons($services);
+    
     // Generate Platform.sh environment variables
     generate_platform_environment_file();
     
@@ -47,5 +51,37 @@ if ($result === 0) {
 } else {
     echo "❌ Failed to convert Platform.sh configuration\n";
     exit(1);
+}
+
+function install_required_addons($services) {
+    if (empty($services)) {
+        return;
+    }
+    
+    $supportedAddons = [
+        'redis' => 'ddev/ddev-redis',
+        'redis-persistent' => 'ddev/ddev-redis', 
+        'memcached' => 'ddev/ddev-memcached',
+        'elasticsearch' => 'ddev/ddev-elasticsearch',
+        'opensearch' => 'ddev/ddev-elasticsearch'
+    ];
+    
+    $otherServices = extract_other_services($services);
+    
+    foreach ($otherServices as $serviceName => $serviceConfig) {
+        $serviceType = $serviceConfig['type'];
+        
+        if (isset($supportedAddons[$serviceType])) {
+            $addon = $supportedAddons[$serviceType];
+            echo "📦 Installing DDEV add-on for {$serviceType}: {$addon}\n";
+            
+            // Run ddev add-on get command
+            $output = shell_exec("cd .. && ddev add-on get {$addon} 2>&1");
+            if ($output) {
+                echo "Add-on output: {$output}\n";
+            }
+            echo "✅ Installed {$addon}\n";
+        }
+    }
 }
 ?>
