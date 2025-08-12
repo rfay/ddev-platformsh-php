@@ -161,6 +161,10 @@ web_environment:
   - \"PLATFORM_BRANCH=main\"
   - \"PLATFORM_PROJECT=ddev-project\"
   - \"PLATFORM_DOCUMENT_ROOT=/var/www/html/{$docroot}\"
+  - \"DB_HOST=db\"
+  - \"DB_NAME=db\"
+  - \"DB_USER=db\"
+  - \"DB_PASSWORD=db\"
 hooks:
   post-start:
     - exec: mkdir -p \${PLATFORM_CACHE_DIR} || true
@@ -190,7 +194,7 @@ function generate_ddev_dockerfile($appConfig) {
         echo "Installing PHP dependencies via Composer\n";
         $dockerfileContent .= "\n# Install PHP dependencies from Platform.sh configuration\n";
         $dockerfileContent .= "ENV COMPOSER_HOME=/usr/local/composer\n";
-        $dockerfileContent .= "RUN echo \"export PATH=\${PATH}:\${COMPOSER_HOME}/vendor/bin\" >/etc/bash/bashrc/composerpath.bashrc\n";
+        $dockerfileContent .= "RUN echo \"export PATH=\${PATH}:\${COMPOSER_HOME}/vendor/bin\" >/etc/bashrc/composerpath.bashrc\n";
         
         foreach ($phpDeps as $pkg => $version) {
             if ($pkg !== 'composer/composer') {
