@@ -27,7 +27,9 @@ jobs:
   tests:
     strategy:
       matrix:
-        ddev_version: [stable, HEAD]
+        # We don't even currently use any of the ddev_version, so limit to HEAD for now.
+        # TODO: Change back when ddev PR goes in.
+        ddev_version: [HEAD]
       fail-fast: false
 
     runs-on: ubuntu-latest
@@ -101,6 +103,4 @@ jobs:
         run: |
           which -a ddev
           ddev --version
-          bats tests --filter-tags ${{ matrix.bats_tag }}
-#        env:
-#          PATH: /usr/local/bin:/home/linuxbrew/.linuxbrew/bin:/snap/bin:/home/runner/.local/bin:/opt/pipx_bin:/home/runner/.cargo/bin:/home/runner/.config/composer/vendor/bin:/usr/local/.ghcup/bin:/home/runner/.dotnet/tools:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+          bats tests --show-output-of-passing-tests --verbose-run
