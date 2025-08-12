@@ -30,6 +30,21 @@ jobs:
         # We don't even currently use any of the ddev_version, so limit to HEAD for now.
         # TODO: Change back when ddev PR goes in.
         ddev_version: [HEAD]
+        bats_file:
+          - composerversion.bats
+          - drupal10.bats
+          - drupal11.bats
+          - drupal9.bats
+          - laravel.bats
+          - mismatched-database.bats
+          - mysql.bats
+          - oddrelationships.bats
+          - oracle-mysql.bats
+          - php.bats
+          - postgresql.bats
+          - wordpress-bedrock.bats
+          - wordpress-composer.bats
+
       fail-fast: false
 
     runs-on: ubuntu-latest
@@ -103,4 +118,4 @@ jobs:
         run: |
           which -a ddev
           ddev --version
-          bats tests --show-output-of-passing-tests --verbose-run
+          bats tests/${{ matrix.bats_file }} --show-output-of-passing-tests --verbose-run
