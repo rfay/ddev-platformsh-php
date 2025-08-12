@@ -165,6 +165,26 @@ function extract_composer_version($appConfig) {
     return '2';
 }
 
+function extract_relationships($appConfig) {
+    if (!isset($appConfig['relationships'])) {
+        return [];
+    }
+    
+    $relationships = [];
+    foreach ($appConfig['relationships'] as $relationshipName => $serviceMapping) {
+        // Parse service mapping like 'db:mysql' or 'cache:redis'
+        if (strpos($serviceMapping, ':') !== false) {
+            list($serviceName, $endpoint) = explode(':', $serviceMapping, 2);
+            $relationships[$relationshipName] = [
+                'service' => $serviceName,
+                'endpoint' => $endpoint
+            ];
+        }
+    }
+    
+    return $relationships;
+}
+
 // Utility function to print parsed configuration for debugging
 function print_parsed_config($appConfig, $services, $routes) {
     echo "Platform.sh Configuration Summary:\n";

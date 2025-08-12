@@ -113,24 +113,49 @@ function generate_all_platform_relationships() {
     
     $relationships = [];
     
-    if (!empty($services)) {
+    if (!empty($services) && $appConfig) {
+        $appRelationships = extract_relationships($appConfig);
         $databases = extract_database_services($services);
         $otherServices = extract_other_services($services);
         
-        // Generate database relationships
-        foreach ($databases as $serviceName => $dbConfig) {
-            $dbType = $dbConfig['type'] . ':' . $dbConfig['version'];
-            $dbRel = generate_database_relationship($serviceName, $dbType, 'database');
-            $relationships = array_merge($relationships, $dbRel);
-            echo "Added database relationship: {$serviceName} ({$dbType})\n";
+        // Generate relationships based on app config relationships section
+        foreach ($appRelationships as $relationshipName => $relationshipConfig) {
+            $serviceName = $relationshipConfig['service'];
+            $endpoint = $relationshipConfig['endpoint'];
+            
+            // Check if it's a database relationship
+            if (isset($databases[$serviceName])) {
+                $dbConfig = $databases[$serviceName];
+                $dbType = $dbConfig['type'] . ':' . $dbConfig['version'];
+                $dbRel = generate_database_relationship($serviceName, $dbType, $relationshipName);
+                $relationships = array_merge($relationships, $dbRel);
+                echo "Added database relationship: {$relationshipName} -> {$serviceName} ({$dbType})\n";
+            }
+            // Check if it's an other service relationship  
+            elseif (isset($otherServices[$serviceName])) {
+                $serviceConfig = $otherServices[$serviceName];
+                $serviceType = $serviceConfig['type'] . ':' . $serviceConfig['version'];
+                $serviceRel = generate_service_relationship($serviceName, $serviceType, $relationshipName);
+                $relationships = array_merge($relationships, $serviceRel);
+                echo "Added service relationship: {$relationshipName} -> {$serviceName} ({$serviceType})\n";
+            }
         }
         
-        // Generate service relationships
-        foreach ($otherServices as $serviceName => $serviceConfig) {
-            $serviceType = $serviceConfig['type'] . ':' . $serviceConfig['version'];
-            $serviceRel = generate_service_relationship($serviceName, $serviceType, $serviceName);
-            $relationships = array_merge($relationships, $serviceRel);
-            echo "Added service relationship: {$serviceName} ({$serviceType})\n";
+        // Fallback: Generate relationships for services without explicit app relationships
+        if (empty($appRelationships)) {
+            foreach ($databases as $serviceName => $dbConfig) {
+                $dbType = $dbConfig['type'] . ':' . $dbConfig['version'];
+                $dbRel = generate_database_relationship($serviceName, $dbType, 'database');
+                $relationships = array_merge($relationships, $dbRel);
+                echo "Added database relationship: {$serviceName} ({$dbType})\n";
+            }
+            
+            foreach ($otherServices as $serviceName => $serviceConfig) {
+                $serviceType = $serviceConfig['type'] . ':' . $serviceConfig['version'];
+                $serviceRel = generate_service_relationship($serviceName, $serviceType, $serviceName);
+                $relationships = array_merge($relationships, $serviceRel);
+                echo "Added service relationship: {$serviceName} ({$serviceType})\n";
+            }
         }
     }
     
@@ -148,12 +173,31 @@ function generate_all_platform_relationships() {
     return $base64Relationships;
 }
 
+function generate_platform_routes() {
+    $projectName = $_ENV['DDEV_SITENAME'] ?? 'ddev-project';
+    
+    // Generate basic route configuration for DDEV site
+    $routes = [
+        "https://{$projectName}.ddev.site/" => [
+            "type" => "upstream",
+            "upstream" => "app:http",
+            "cache" => [
+                "enabled" => false
+            ]
+        ]
+    ];
+    
+    $jsonRoutes = json_encode($routes, JSON_UNESCAPED_SLASHES);
+    $base64Routes = base64_encode($jsonRoutes);
+    
+    echo "Generated PLATFORM_ROUTES for site: https://{$projectName}.ddev.site/\n";
+    
+    return $base64Routes;
+}
+
 function generate_platform_environment_file() {
     $relationships = generate_all_platform_relationships();
-    
-    if (empty($relationships)) {
-        return;
-    }
+    $routes = generate_platform_routes();
     
     // Generate .environment file for Platform.sh environment variables
     $appRoot = $_ENV['DDEV_APPROOT'] ?? '/var/www/html';
@@ -162,13 +206,18 @@ function generate_platform_environment_file() {
     $envContent = "#ddev-generated
 # Platform.sh environment variables for DDEV
 export PLATFORM_RELATIONSHIPS=\"{$relationships}\"
+export PLATFORM_ROUTES=\"{$routes}\"
 export PLATFORM_APPLICATION_NAME=\"app\"
 export PLATFORM_ENVIRONMENT=\"main\"
 export PLATFORM_BRANCH=\"main\"
 export PLATFORM_TREE_ID=\"main\"
 export PLATFORM_PROJECT=\"ddev-project\"
+export PLATFORM_PROJECT_ENTROPY=\"ddev-entropy-12345\"
 export PLATFORM_APP_DIR=\"{$appRoot}\"
 export PLATFORM_DOCUMENT_ROOT=\"{$appRoot}/" . ($_ENV['DDEV_DOCROOT'] ?? 'web') . "\"
+export PLATFORM_CACHE_DIR=\"{$appRoot}/tmp/cache\"
+export PLATFORM_VARIABLES=\"\"
+export PLATFORM_SMTP_HOST=\"\"
 ";
     
     file_put_contents($environmentFile, $envContent);

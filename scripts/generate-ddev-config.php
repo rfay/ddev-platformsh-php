@@ -146,6 +146,41 @@ composer_version: \"{$composerVersion}\"
     echo "Generated config.platformsh.yaml\n";
 }
 
+function generate_ddev_dockerfile($appConfig) {
+    if (!$appConfig || !isset($appConfig['dependencies']['php'])) {
+        return;
+    }
+    
+    $phpDeps = $appConfig['dependencies']['php'];
+    $dockerfileContent = "#ddev-generated\nRUN ln -sf /var/www/html /app\n";
+    
+    $hasComposerDeps = false;
+    foreach ($phpDeps as $pkg => $version) {
+        if ($pkg !== 'composer/composer') {
+            $hasComposerDeps = true;
+            break;
+        }
+    }
+    
+    if ($hasComposerDeps) {
+        echo "Installing PHP dependencies via Composer\n";
+        $dockerfileContent .= "\n# Install PHP dependencies from Platform.sh configuration\n";
+        $dockerfileContent .= "ENV COMPOSER_HOME=/usr/local/composer\n";
+        $dockerfileContent .= "RUN echo \"export PATH=\${PATH}:\${COMPOSER_HOME}/vendor/bin\" >/etc/bash/bashrc/composerpath.bashrc\n";
+        
+        foreach ($phpDeps as $pkg => $version) {
+            if ($pkg !== 'composer/composer') {
+                $versionSpec = ($version !== '*') ? ":{$version}" : '';
+                $dockerfileContent .= "RUN composer global require {$pkg}{$versionSpec}\n";
+                echo "- {$pkg}{$versionSpec}\n";
+            }
+        }
+    }
+    
+    file_put_contents('web-build/Dockerfile.platformsh', $dockerfileContent);
+    echo "Generated web-build/Dockerfile.platformsh\n";
+}
+
 function generate_all_ddev_config() {
     echo "Generating DDEV configuration from Platform.sh files...\n";
     
@@ -168,6 +203,7 @@ function generate_all_ddev_config() {
         $docroot = extract_docroot($appConfig);
         $composerVersion = extract_composer_version($appConfig);
         generate_ddev_php_config($phpVersion, $docroot, $composerVersion);
+        generate_ddev_dockerfile($appConfig);
     }
     
     if (!empty($services)) {
