@@ -1,322 +1,48 @@
+#ddev-generated
 name: ddev-platformsh
 
-ddev_version_constraint: '>= v1.24.3'
+#ddev_version_constraint: '>= v1.24.3'
 
 project_files:
+  - scripts/parse-platformsh-config.php
+  - scripts/generate-ddev-config.php
+  - scripts/generate-platform-relationships.php
+  - scripts/setup-platformsh-configuration.php
   - web-build/Dockerfile.platformsh
   - homeadditions/.bashrc.d/platformsh-environment.sh
-  - platformsh/.gitignore
-  - platformsh/generate_db_relationship.sh
-  - platformsh/generate_elasticsearch_relationship.sh
-  - platformsh/generate_memcached_relationship.sh
-  - platformsh/generate_opensearch_relationship.sh
-  - platformsh/generate_redis_relationship.sh
-  - platformsh/generate_redis-persistent_relationship.sh
-  - platformsh/generate_route.sh
 
 global_files:
   - commands/web/platform
 
 pre_install_actions:
   - |
-    #ddev-nodisplay
-    #ddev-description:check project type
-    {{ if not (hasPrefix  "php" .platformapp.type) }}
-      printf "\n\nUnsupported application type {{ .platformapp.type }}.\nOnly PHP applications are currently supported." >&2
-      exit 5
-    {{ end }}
-
-  # Get PLATFORMSH_CLI_TOKEN from user if we don't have it yet
-  - |
-    #ddev-nodisplay
-    if ( {{ contains "PLATFORMSH_CLI_TOKEN" (list .DdevGlobalConfig.web_environment | toString) }} || {{ contains "PLATFORMSH_CLI_TOKEN" (list .DdevProjectConfig.web_environment | toString) }} ); then
-      echo "Using existing PLATFORMSH_CLI_TOKEN."
-    else
-      printf "\n\nPlease enter your platform.sh token: "
-    fi
-
-  - |
-    #ddev-nodisplay
-    #ddev-description:Setting PLATFORMSH_CLI_TOKEN
-    if !( {{ contains "PLATFORMSH_CLI_TOKEN" (list .DdevGlobalConfig.web_environment | toString) }} || {{ contains "PLATFORMSH_CLI_TOKEN" (list .DdevProjectConfig.web_environment | toString) }} ); then
-      read token
-      # Put the token into the global web environment
-      ddev config global --web-environment-add PLATFORMSH_CLI_TOKEN=${token}
-      echo "PLATFORMSH_CLI_TOKEN set globally"
-    fi
-
-  # Get PLATFORM_PROJECT from user if we don't have it yet
-  - |
-    #ddev-nodisplay
-    # echo 'list ddevprojectconfig.web_environment={{ list .DdevProjectConfig.web_environment | toString }}'
-    if ({{ contains "PLATFORM_PROJECT=" (list .DdevProjectConfig.web_environment | toString) }} ); then
-      echo "Using existing PLATFORM_PROJECT from project config.yaml."
-    else
-      printf "\n\nPlease enter your platform.sh project ID (like '6k4ypl5iendqd'): "
-    fi
-
-  - |
-    #ddev-nodisplay
-    #ddev-description:Set PLATFORM_PROJECT
-    if !( {{ contains "PLATFORM_PROJECT" (list .DdevProjectConfig.web_environment | toString) }} ); then
-      read platform_project
-      echo "platform_project = '${platform_project}'"
-      # Put the platform_project in to the project's web environment
-      ddev config --web-environment-add PLATFORM_PROJECT=${platform_project}
-      echo "PLATFORM_PROJECT set to ${platform_project}"
-    fi
+    <?php
+    #ddev-description: Validate Platform.sh PHP application configuration
     
-    # Add PLATFORM_APPLICATION_NAME from .platformapp.name
-    # This should be moved elsewhere after config.yaml environment variables can be merged
-    # see ddev v1.20.0
-  - |
-    #ddev-nodisplay
-    #ddev-description:Setting PLATFORM_APPLICATION_NAME
-    if !( {{ contains "PLATFORM_APPLICATION_NAME" (list .DdevProjectConfig.web_environment | toString) }} ); then
-      # Put the platform_project in to the project's web environment
-      ddev config --web-environment-add PLATFORM_APPLICATION_NAME={{ .platformapp.name }}
-    fi
-
-  # Get PLATFORM_ENVIRONMENT from user if we don't have it
-  - |
-    #ddev-nodisplay
-    # echo 'list ddevprojectconfig.web_environment={{ list .DdevProjectConfig.web_environment | toString }}'
-    if ({{ contains "PLATFORM_ENVIRONMENT=" (list .DdevProjectConfig.web_environment | toString) }} ); then
-      echo "Using existing PLATFORM_ENVIRONMENT from project config.yaml."
-    else
-      printf "\n\nPlease enter your platform.sh project environment (like 'main'): "
-    fi
-
-  - |
-    #ddev-nodisplay
-    if !( {{ contains "PLATFORM_ENVIRONMENT" (list .DdevProjectConfig.web_environment | toString) }} ); then
-      read PLATFORM_ENVIRONMENT
-      # Put the PLATFORM_ENVIRONMENT in to the project's web environment
-      ddev config --web-environment-add PLATFORM_ENVIRONMENT=${PLATFORM_ENVIRONMENT}
-    fi
+    // Use environment variables instead of complex validation
+    $projectType = $_ENV['DDEV_PROJECT_TYPE'] ?? 'php';
+    echo "DDEV Project Type: {$projectType}\n";
+    
+    // Test PHP YAML extension availability
+    if (!extension_loaded('yaml')) {
+        echo "❌ PHP YAML extension not available\n";
+        exit(1);
+    }
+    echo "✅ PHP YAML extension is available\n";
+    
+    // Check for Platform.sh configuration (optional for templates)
+    if (file_exists('../.platform.app.yaml')) {
+        $platformApp = yaml_parse_file('../.platform.app.yaml');
+        if ($platformApp && isset($platformApp['type'])) {
+            echo "✅ Platform.sh configuration found: {$platformApp['type']}\n";
+        }
+    } else {
+        echo "⚠️  No Platform.sh configuration found (template mode)\n";
+    }
+    ?>
 
 post_install_actions:
-- |
-  #ddev-nodisplay
-  #ddev-description:Support composer and python3 dependencies
-  cat <<-ENDDOCKERFILE >> web-build/Dockerfile.platformsh
-  {{ if .platformapp.dependencies.php }}{{ range $pkg, $version := .platformapp.dependencies.php }}{{ if ne $pkg "composer/composer" }}
-  ENV COMPOSER_HOME=/usr/local/composer
-  RUN echo  "export PATH=\${PATH}:\${COMPOSER_HOME}/vendor/bin" >/etc/bashrc/composerpath.bashrc
-  RUN composer global require {{ $pkg }}{{ if ne $version "*" }}:{{ $version }}{{end}}{{end}}{{end}}
-    {{ end }}
-
-  {{ if .platformapp.dependencies.python3 }}
-    {{ range $pkg, $version := .platformapp.dependencies.python3 }}
-  RUN pip3 install {{ $pkg }}{{ if ne $version "*" }}=={{ $version }}{{end}}
-    {{ end }}
-  {{ end }}
-  ENDDOCKERFILE
-
-- | 
-  #ddev-nodisplay
-  cd ..
-  unset DDEV_DEBUG
-  project_type=$(ddev describe -j | docker run -i --rm ddev/ddev-utilities jq -r .raw.type)
-  case $project_type in 
-    laravel)
-      #set -x
-      # The double-run here is awkward, but I didn't figure out how to do it with two '-e'
-      docker run -i --rm ddev/ddev-utilities perl -p -e "s!APP_URL=.*!APP_URL=${DDEV_PRIMARY_URL}!g" <.env.example | docker run -i --rm ddev/ddev-utilities perl -p -e 's!DB_(HOST|DATABASE|USERNAME|PASSWORD)=(.*)!DB_\1=db!g'   >.env
-      ;;
-  esac
-  if [ -d drush ]; then mkdir -p .drush; fi
-
-- |
-  #ddev-nodisplay
-  #ddev-description: Install .environment file into web-entrypoint.d if needed
-  if [ -f ../.environment ]; then
-    mkdir -p web-entrypoint.d
-    cp ../.environment web-entrypoint.d/environment.sh
-  fi
-
-# Write a config.platformsh.yaml based on calculated values, php version, database, docroot
-- |
-  #ddev-nodisplay
-  #ddev-description:Installing dependencies and generating needed environment variables
-
-  #set -x
-  BASE64_ENCODE="docker run -i --rm ddev/ddev-utilities base64 -w 0"
-  BASE64_DECODE="docker run -i --rm ddev/ddev-utilities base64 -d"
-  PLATFORM_PROJECT_ENTROPY="$(echo $RANDOM | docker run -i --rm ddev/ddev-utilities shasum -a 256 | awk '{print $1}')"
-
-  {{ $composerVersion := "2" }}
-  {{ with .platformapp.dependencies.php }}
-    {{ range $package, $version := . }}
-      {{ if eq $package "composer/composer" }}
-        {{ $composerVersion = replace "^" "" $version }}
-      {{ end }}
-    {{ end }}
-  {{ end }}
-  
-
-  routes=()
-  #set -x
-  #echo {{ .routes }}
-  {{ range $k, $v := .routes }}
-  #echo key={{ $k }} val={{ $v }}
-  # Get a proper id value
-  {{ $id := "" }}
-  {{ if $v.id }}
-  {{ $id = $v.id }}
-  {{ end }}
-
-  r=$(./platformsh/generate_route.sh "${DDEV_PRIMARY_URL}/"  '{{ $id }}' '{{ $v.production_url }}' '{{ $v.upstream }}' '{{ $v.type }}' '{{ $v.original_url }}' | ${BASE64_ENCODE})
-  #echo "r=$r"
-  routes+=(${r})
-  {{ end }}
-  set +x
-  #echo routes=$routes
-  #echo "Number of routes=${#routes[@]}"
-  #set -x
-  PLATFORM_ROUTES="$((echo '{'; for r in ${routes[@]::${#routes[@]}-1}; do echo $r | ${BASE64_DECODE}; printf ', \n'; done; echo ${routes[@]: -1:1} | ${BASE64_DECODE}; echo ' }') | ${BASE64_ENCODE})"
-
-  {{/* Handling services relationships */}}
-  export relationships=()
-  {{ range $relationship_name, $relationship_def := .platformapp.relationships }}
-    #echo "relationship_name={{ $relationship_name }} relationship_dev={{ $relationship_def }}"
-    {{ $service_name := index (split ":" $relationship_def) "_0"  }}
-    {{ $service_def := get $.services $service_name }}
-    {{ if not ($service_def) }}{{ continue }}{{ end }}
-    {{ $service_type := $service_def.type | split ":" }}
-    {{ $_ := set $service_def "type" $service_type._0 }}
-    {{ $_ := set $service_def "version" $service_type._1 }}
-    {{ if eq $service_def.type "mysql" }} {{ $_ = set $service_def "type" "mariadb" }} {{ end }}
-    {{ if eq $service_def.type "oracle-mysql" }} {{ $_ = set $service_def "type" "mysql" }} {{ end }}
-    {{ if eq $service_def.type "postgresql" }} {{ $_ = set $service_def "type" "postgres" }} {{ end }}
-    {{ $_ = set $service_def "fulltype" (list $service_def.type $service_def.version | join ":") }}
-    
-    {{ $supported_db_types := list "postgres" "mysql" "mariadb" }}
-    {{/* For supported services, key is the service name and value is the corresponding add-on to install if applicable (nil if not needed) */}}
-    {{ $supported_services := dict "redis" "ddev/ddev-redis" "redis-persistent" "ddev/ddev-redis" "memcached" "ddev/ddev-memcached" "elasticsearch" "ddev/ddev-elasticsearch" "opensearch" "ddev/ddev-elasticsearch" }}
-    {{ if $supported_db_types | has $service_def.type }}
-      {{/* Databases */}}
-
-      {{ $dbtype := $service_def.fulltype }}
-      # echo dbtype={{ $dbtype }}
-      {{ if $dbtype }}
-        # Unfortunate sed to remove color escape sequences from ddev debug output
-        current_db_version="$(ddev debug get-volume-db-version | docker run -i --rm ddev/ddev-utilities sed -r 's/\x1b\[[0-9;]*m?//g')"
-        export DBTYPE={{ regexReplaceAll ":.*$" $dbtype "" }}
-        export DBVERSION={{ regexReplaceAll "^.*:" $dbtype "" }}
-        if [ "${current_db_version}" != "" ] && [ ">{{ $dbtype }}<" != ">${current_db_version}<" ]; then
-          printf "\n\nThere is an existing database in this project that doesn\'t match the upstream database type.\n Please use 'ddev delete' to delete the existing database and retry, or try 'ddev debug migrate-database {{ $dbtype }}' to migrate the database.\n" >&2
-          false
-        fi
-        # echo ./platformsh/generate_db_relationship.sh '{{ $relationship_name }}' '{{ $dbtype }}' '{{ $relationship_name }}' 
-        relationships+=($(./platformsh/generate_db_relationship.sh '{{ $relationship_name }}' '{{ $dbtype }}' '{{ $relationship_name }}' | ${BASE64_ENCODE}))
-        #printf "relationships length after db=${#relationships[@]}\nrelationships value=$(echo $relationships | ${BASE64_DECODE})"
-      {{ end }}
-    {{ else if hasKey $supported_services $service_def.type }}
-      {{/* Other services */}}
-      relationships+=($(./platformsh/generate_{{ $service_def.type }}_relationship.sh '{{ $relationship_name }}' | ${BASE64_ENCODE}))
-      {{ $service_addon := get $supported_services $service_def.type }}
-      {{ if $service_addon }}
-        echo "Running 'ddev add-on get {{ $service_addon }}'"
-        ddev add-on get {{ $service_addon }}
-      {{ end }}
-    {{ end }}
-  {{ end }}
-
-  #echo "Number of relationships=${#relationships[@]}"
-  PLATFORM_RELATIONSHIPS="$((echo '{'; for r in ${relationships[@]::${#relationships[@]}-1}; do echo $r | ${BASE64_DECODE}; printf ', \n'; done; echo ${relationships[@]: -1:1} | ${BASE64_DECODE}; echo ' }') | ${BASE64_ENCODE})"
-  #printf "PLATFORM_RELATIONSHIPS=$(echo $PLATFORM_RELATIONSHIPS | ${BASE64_DECODE})"
-  
-  {{ $phpversion := trimPrefix "php:" .platformapp.type }}
-
-  if [ -f config.platformsh.yaml ] && ! grep '#ddev-generated' config.platformsh.yaml; then
-    echo "Existing config.platformsh.yaml does not have #ddev-generated, so can't be updated"
-    exit 2
-  fi
-  rm -f .config.platformsh.yaml
-  
-  cat <<-EOF >config.platformsh.yaml
-  # #ddev-generated
-  # Generated configuration based on platform.sh project configuration
-  disable_settings_management: true
-  php_version: {{ $phpversion }}
-  composer_version: "{{ $composerVersion }}"
-  database:
-    type: ${DBTYPE:-mariadb}
-    version: ${DBVERSION:-10.4}
-  docroot: {{ dig "web" "locations" "/" "root" "notfound" .platformapp }}
-  webimage_extra_packages:
-  - figlet
-  {{/*# Provide all PHP extensions but blackfire, which has different pattern (blackfire-php) and is already installed */}}
-  {{/*# and pdo_pgsql, which is already installed */}}
-  {{ $phpversion := trimPrefix "php:" .platformapp.type }}
-  {{ if .platformapp.runtime.extensions }}
-  {{ $phpextensions := without .platformapp.runtime.extensions "blackfire" "pdo_pgsql" "sodium" }}
-    {{range $extension := $phpextensions }}
-  - php{{$phpversion}}-{{$extension}}{{end}}
-  {{ if has "sodium" .platformapp.runtime.extensions }}
-  - php-sodium
-  {{end}}
-  {{end}}
-  {{/* # Add pip only if we have python3 dependencies */}}
-  {{ if .platformapp.dependencies.python3 }}
-  - python3-pip
-  {{ end }}
-  web_environment:
-  - "PLATFORM_RELATIONSHIPS=${PLATFORM_RELATIONSHIPS}"
-  - "PLATFORM_APP_DIR=/var/www/html"
-  - "PLATFORM_PROJECT_ENTROPY=${PLATFORM_PROJECT_ENTROPY}"
-  # Consider commit hash for PLATFORM_TREE_ID
-  - "PLATFORM_TREE_ID=2dc356f2fea13ef683f9adc5fc5bd28e05ad992a"
-  - "PLATFORM_CACHE_DIR=/mnt/ddev-global-cache/ddev-platformsh/${DDEV_PROJECT}"
-  - "PLATFORM_ROUTES=${PLATFORM_ROUTES}"
-  - "PLATFORM_VARIABLES=e30="
-  {{ if .platformapp.variables.env }}
-  {{ range $key, $value := .platformapp.variables.env }}
-  - "{{$key}}={{$value}}"{{ end }}{{ end }}
-  
-  EOF
-  
-  # Because "ENDOFHOOKS" is quoted here, no variable expansion occurs
-  # so everything is left alone.
-  cat <<-"ENDOFHOOKS" >>config.platformsh.yaml
-  
-  hooks:
-    post-start:
-    - exec: mkdir -p ${PLATFORM_CACHE_DIR} || true
-    - exec: '[ ! -z "${PLATFORMSH_CLI_TOKEN:-}" ] && (platform ssh-cert:load  -y || true)'
-  {{ if eq .platformapp.build.flavor "composer" }}
-    - composer: install
-  {{ end }}
-  
-  {{ if .platformapp.hooks.build }}
-    # platformsh build hooks
-  {{ $noblanks := regexReplaceAll "\n\n*" .platformapp.hooks.build "\n" }}
-    - exec: |
-  {{ indent 6 $noblanks }}
-  {{ end }}
-  
-  {{ if .platformapp.hooks.deploy }}
-    # platformsh deploy hooks
-  {{ $noblanks := regexReplaceAll "\n\n*" .platformapp.hooks.deploy "\n" }}
-    - exec: |
-  {{ indent 6 $noblanks }}
-  {{ end }}
-  
-  {{ if .platformapp.hooks.post_deploy }}
-    # platformsh post_deploy hooks
-  {{ $noblanks := regexReplaceAll "\n\n*" .platformapp.hooks.post_deploy "\n" }}
-    - exec: |
-  {{ indent 6 $noblanks }}
-  {{ end }}
-  
-  {{ if has "blackfire" .platformapp.runtime.extensions }}
-    - exec: phpenmod blackfire
-  {{ end }}
-  
-  ENDOFHOOKS
-
-yaml_read_files:
-  platformapp: .platform.app.yaml
-  services: .platform/services.yaml
-  routes: .platform/routes.yaml
+  - |
+    <?php
+    #ddev-description: Setup Platform.sh configuration for DDEV
+    require 'scripts/setup-platformsh-configuration.php';

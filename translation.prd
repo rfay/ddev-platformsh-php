@@ -1,0 +1,154 @@
+# DDEV Platform.sh Add-on Translation PRD
+
+## Overview
+
+Translate the existing bash-style DDEV Platform.sh add-on into a PHP-based add-on using DDEV's new experimental PHP add-on feature. The goal is to maintain equivalent functionality while modernizing the implementation approach.
+
+## Background
+
+- Current add-on uses bash scripts and Go templating for Platform.sh integration
+- New PHP add-on feature is being developed in https://github.com/rfay/ddev/pull/51
+- PHP add-on documentation is available in ../ddev/docs/content/developers/tmp
+- DDEV now includes php-yaml extension for configuration parsing
+
+## Platform.sh Configuration Structure
+
+The add-on's primary purpose is to translate Platform.sh configuration into equivalent DDEV configuration **at install time**. Understanding Platform.sh YAML structure is critical for the translation.
+
+### Core Platform.sh Configuration Files
+
+#### .platform.app.yaml
+**Purpose**: Application configuration  
+**Key Sections**:
+- `type`: PHP version (e.g., `php:8.1`)
+- `dependencies`: PHP packages and Python dependencies
+- `runtime.extensions`: PHP extensions to enable
+- `variables.env`: Environment variables
+- `relationships`: Service connections (database, Redis, etc.)
+- `web.locations."/".root`: Document root path
+- `hooks`: Build, deploy, and post-deploy commands
+- `build.flavor`: Build type (e.g., `composer`)
+
+#### .platform/services.yaml  
+**Purpose**: Service definitions (databases, caching, search)
+**Structure**: 
+```yaml
+database:
+  type: mariadb:10.4
+redis:
+  type: redis:6.0
+elasticsearch:
+  type: elasticsearch:7.5
+```
+
+#### .platform/routes.yaml
+**Purpose**: URL routing configuration
+**Structure**:
+```yaml
+"https://{default}/":
+  type: upstream
+  upstream: "app:http"
+  cache:
+    enabled: true
+```
+
+### Add-on Translation Process
+
+1. **Read Platform.sh YAML files** at install time
+2. **Parse service relationships** from .platform.app.yaml relationships section
+3. **Map Platform.sh services** to equivalent DDEV services/add-ons
+4. **Generate DDEV configuration** (config.platformsh.yaml) with:
+   - PHP version from application type
+   - Database type/version from services
+   - Environment variables for Platform.sh compatibility
+   - Document root from web.locations
+   - Build hooks from Platform.sh hooks
+5. **Install required DDEV add-ons** (ddev-redis, ddev-elasticsearch, etc.)
+6. **Create Platform.sh environment variables** (PLATFORM_RELATIONSHIPS, PLATFORM_ROUTES)
+
+### Platform.sh Documentation Reference
+- **Main Documentation**: https://docs.platform.sh/
+- **Reference Section**: Configuration file specifications
+- **.platform.app.yaml Reference**: https://docs.platform.sh/create-apps/app-reference.html
+- **Services Reference**: https://docs.platform.sh/add-services.html
+- **Routes Reference**: https://docs.platform.sh/define-routes.html
+
+Understanding these structures is essential for PHP translation since the add-on must parse and transform this configuration into DDEV equivalents.
+
+## Core Requirements
+
+### Functionality Preservation
+- All existing BATS tests in tests/* must pass with minimal changes
+- Add-on behavior must remain equivalent to current bash implementation
+- Platform.sh configuration parsing and DDEV integration must work identically
+
+### Implementation Approach
+- Replace bash scripts in platformsh/*.sh with PHP equivalents
+- Eliminate complex Go templating in favor of direct PHP implementation
+- Use php-yaml to read Platform.sh config files instead of yaml_read_files
+- Maintain same overall structure in install.yaml
+- Keep platformsh directory structure but convert scripts to PHP
+
+### Technical Constraints
+- Must work with experimental PHP add-on framework
+- Leverage built-in php-yaml extension in default DDEV image
+- Preserve existing install.yaml structure where possible
+- Focus translation efforts on install.yaml and platformsh/*.sh files
+
+## Success Criteria
+
+### Primary Goals
+1. All existing BATS tests pass without modification
+2. Platform.sh projects can be imported and configured identically
+3. DDEV services are configured correctly based on Platform.sh config
+4. Database and service connections work as expected
+
+### Implementation Standards
+- Clean, maintainable PHP code
+- Proper error handling and logging
+- Documentation for PHP-specific implementation details
+- Performance equivalent to or better than bash version
+
+## PHP Add-on Framework Capabilities
+
+### Available During PHP Execution
+- **Processed DDEV Configuration**: Full project configuration available at `.ddev-config/project_config.yaml`
+- **Global DDEV Configuration**: Global settings available at `.ddev-config/global_config.yaml`
+- **Environment Variables**: All standard DDEV environment variables via `$_ENV` 
+- **Working Directory**: PHP actions execute in `/var/www/html/.ddev`
+- **php-yaml Extension**: Built-in YAML parsing with `yaml_parse_file()` and `yaml_emit()`
+- **Platform.sh Config Access**: Direct access to `.platform.app.yaml`, `.platform/services.yaml`, `.platform/routes.yaml`
+
+### Configuration Access Advantages
+- Eliminates need for `ddev debug configyaml` commands
+- No complex Go templating required for accessing DDEV settings
+- Direct PHP access to processed configuration data
+- Simplified path handling with consistent working directory
+
+## Technical Scope
+
+### Files to Translate
+- install.yaml (structure preserved, implementation updated)
+- platformsh/*.sh scripts → PHP equivalents
+- Configuration parsing logic (replace Go templating with direct PHP YAML access)
+- Service setup and configuration
+
+### Files to Preserve
+- tests/* (BATS tests remain unchanged)
+- README and documentation (updated for PHP implementation notes)
+- Platform.sh config file examples
+
+## Deliverables
+
+1. Translated PHP-based add-on with equivalent functionality
+2. Updated install.yaml using PHP add-on framework
+3. PHP scripts replacing bash scripts in platformsh/
+4. All BATS tests passing
+5. Documentation updates for PHP-specific implementation details
+
+## Implementation Notes
+
+- Leverage php-yaml for config parsing instead of yaml_read_files
+- Direct PHP implementation eliminates Go templating complexity
+- Maintain compatibility with existing Platform.sh project structures
+- Focus on code clarity and maintainability over complex abstractions
