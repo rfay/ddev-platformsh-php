@@ -12,9 +12,11 @@ function generate_database_relationship($serviceName, $dbType, $relationshipName
     $port = 3306;
     $rel = 'mysql';
     
-    // Convert Platform.sh mysql to mariadb for DDEV compatibility
+    // Apply Platform.sh to DDEV database type mapping (matches bash add-on logic)
     $ddevDbType = $dbType;
-    if (strpos($dbType, 'mysql:') === 0) {
+    if (strpos($dbType, 'oracle-mysql:') === 0) {
+        $ddevDbType = str_replace('oracle-mysql:', 'mysql:', $dbType);
+    } elseif (strpos($dbType, 'mysql:') === 0) {
         $ddevDbType = str_replace('mysql:', 'mariadb:', $dbType);
     }
     

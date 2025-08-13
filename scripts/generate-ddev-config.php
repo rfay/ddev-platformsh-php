@@ -19,11 +19,14 @@ function generate_ddev_database_config($databases) {
     echo "Configuring DDEV for database: {$primaryName} ({$primaryDb['type']}:{$primaryDb['version']})\n";
     
     // Generate database configuration for DDEV's config
+    // Apply Platform.sh to DDEV database type mapping (matches bash add-on logic)
     $ddevDbType = $primaryDb['type'];
     if ($primaryDb['type'] === 'mysql') {
         $ddevDbType = 'mariadb';
-    } elseif ($primaryDb['type'] === 'postgres') {
-        $ddevDbType = 'postgres'; // Keep postgres as-is for DDEV
+    } elseif ($primaryDb['type'] === 'oracle-mysql') {
+        $ddevDbType = 'mysql';  // oracle-mysql in Platform.sh becomes mysql in DDEV
+    } elseif ($primaryDb['type'] === 'postgresql') {
+        $ddevDbType = 'postgres';
     }
     $yamlContent = "#ddev-generated
 # Platform.sh database configuration - sets primary database

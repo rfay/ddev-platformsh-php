@@ -63,10 +63,12 @@ function extract_database_services($services) {
         if (isset($serviceConfig['type'])) {
             $type = $serviceConfig['type'];
             
-            // Check for database types
+            // Check for database types - preserve oracle-mysql vs mysql distinction
             if (strpos($type, 'mysql') !== false || strpos($type, 'mariadb') !== false) {
+                // Extract the base type (before the colon) to preserve oracle-mysql vs mysql
+                $baseType = explode(':', $type)[0];
                 $databases[$serviceName] = [
-                    'type' => 'mysql',
+                    'type' => $baseType,  // Keep original: mysql, oracle-mysql, or mariadb
                     'version' => extract_version_from_type($type),
                     'disk' => $serviceConfig['disk'] ?? 1024
                 ];
