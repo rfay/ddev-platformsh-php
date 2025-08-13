@@ -38,6 +38,52 @@ pre_install_actions:
 
 post_install_actions:
   - |
+    #ddev-description: Check database compatibility and install required DDEV add-ons
+    
+    # Check if there's an existing database volume
+    current_db_version="$(ddev debug get-volume-db-version 2>/dev/null || echo '')"
+    
+    if [ -n "$current_db_version" ] && [ -f ../.platform/services.yaml ]; then
+        # Get the Platform.sh database type and translate it to DDEV type
+        platform_db_type=$(grep -E "type: *(mysql|oracle-mysql|postgresql|mariadb)" ../.platform/services.yaml | head -1 | sed 's/.*type: *//' || echo "")
+        
+        if [ -n "$platform_db_type" ]; then
+            # Translate Platform.sh database type to DDEV type
+            case "$platform_db_type" in
+                mysql:*) expected_ddev_db="mariadb:${platform_db_type#mysql:}" ;;
+                oracle-mysql:*) expected_ddev_db="mysql:${platform_db_type#oracle-mysql:}" ;;
+                postgresql:*) expected_ddev_db="postgres:${platform_db_type#postgresql:}" ;;
+                mariadb:*) expected_ddev_db="$platform_db_type" ;;
+                *) expected_ddev_db="$platform_db_type" ;;
+            esac
+            
+            # Check if existing database matches Platform.sh expectation
+            if [ "$current_db_version" != "$expected_ddev_db" ]; then
+                printf "\n\nThere is an existing database in this project that doesn't match the upstream database type.\n Please use 'ddev delete' to delete the existing database and retry, or try 'ddev debug migrate-database $expected_ddev_db' to migrate the database.\n" >&2
+                exit 1
+            fi
+        fi
+    fi
+    
+    # Install required service add-ons
+    if [ -f ../.platform/services.yaml ]; then
+        if grep -q "redis" ../.platform/services.yaml; then
+            echo "📦 Installing Redis add-on..."
+            ddev add-on get ddev/ddev-redis
+        fi
+        
+        if grep -q "memcached" ../.platform/services.yaml; then
+            echo "📦 Installing Memcached add-on..."
+            ddev add-on get ddev/ddev-memcached
+        fi
+        
+        if grep -q "elasticsearch" ../.platform/services.yaml; then
+            echo "📦 Installing Elasticsearch add-on..."
+            ddev add-on get ddev/ddev-elasticsearch
+        fi
+    fi
+    
+  - |
     <?php
     #ddev-description: Setup Platform.sh configuration for DDEV
     require 'scripts/setup-platformsh-configuration.php';

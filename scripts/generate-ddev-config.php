@@ -240,10 +240,9 @@ function generate_all_ddev_config() {
     
     if (!empty($services)) {
         $databases = extract_database_services($services);
-        $otherServices = extract_other_services($services);
         
         generate_ddev_database_config($databases);
-        generate_ddev_services_config($otherServices);
+        // Note: Other services are handled by DDEV add-ons installed in setup script
     }
     
     echo "DDEV configuration generation complete!\n";
