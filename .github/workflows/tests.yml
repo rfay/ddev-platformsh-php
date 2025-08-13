@@ -65,14 +65,18 @@ jobs:
         run: |
           set -eu -o pipefail
           
-          # Get latest successful workflow run with artifacts for PHP addon branch
+          # Get latest successful workflow run with artifacts for PHP addon PR
+          # For forked PRs, we need to find the workflow run in ddev/ddev that built the PR
           RUN_ID=""
-          WORKFLOW_RUNS=$(curl -s --fail "https://api.github.com/repos/rfay/ddev/actions/runs?branch=20250806_rfay_php_addon&per_page=5" || echo '{"workflow_runs":[]}')
-          # echo "API Response: $WORKFLOW_RUNS"
           
-          for run_id in $(echo "$WORKFLOW_RUNS" | jq -r '.workflow_runs[] | select(.conclusion=="success") | .id'); do
+          # Try to find workflow runs for PR #7523 in ddev/ddev
+          echo "Looking for workflow runs for PR #7523 in ddev/ddev..."
+          WORKFLOW_RUNS=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs?per_page=50" || echo '{"workflow_runs":[]}')
+          
+          # Look for runs that are from PR #7523 specifically
+          for run_id in $(echo "$WORKFLOW_RUNS" | jq -r '.workflow_runs[] | select(.conclusion=="success" and (.head_branch=="20250806_rfay_php_addon" or (.event=="pull_request" and .pull_requests[]?.number==7523))) | .id'); do
             echo "Checking run $run_id for artifacts..."
-            ARTIFACT_COUNT=$(curl -s --fail "https://api.github.com/repos/rfay/ddev/actions/runs/$run_id/artifacts" | jq '.total_count')
+            ARTIFACT_COUNT=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs/$run_id/artifacts" | jq '.total_count')
             echo "Artifact count for run $run_id: $ARTIFACT_COUNT"
             if [ "$ARTIFACT_COUNT" -gt 0 ]; then
               RUN_ID=$run_id
@@ -88,7 +92,7 @@ jobs:
           echo "Using run ID: $RUN_ID"
           
           # Get ddev-linux-amd64 artifact ID from the run
-          ARTIFACT_ID=$(curl -s --fail "https://api.github.com/repos/rfay/ddev/actions/runs/$RUN_ID/artifacts" | jq -r '.artifacts[] | select(.name=="ddev-linux-amd64") | .id')
+          ARTIFACT_ID=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs/$RUN_ID/artifacts" | jq -r '.artifacts[] | select(.name=="ddev-linux-amd64") | .id')
           echo "Artifact ID: $ARTIFACT_ID"
           
           if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
@@ -97,7 +101,7 @@ jobs:
           fi
           
           # Download and install PHP addon DDEV binary
-          DOWNLOAD_URL="https://nightly.link/rfay/ddev/actions/artifacts/$ARTIFACT_ID.zip"
+          DOWNLOAD_URL="https://nightly.link/ddev/ddev/actions/artifacts/$ARTIFACT_ID.zip"
           echo "Downloading from: $DOWNLOAD_URL"
           curl -sSL --fail "$DOWNLOAD_URL" -o ddev-php-addon.zip
           unzip -q ddev-php-addon.zip
