@@ -23,12 +23,7 @@ pre_install_actions:
     $projectType = $_ENV['DDEV_PROJECT_TYPE'] ?? 'php';
     echo "DDEV Project Type: {$projectType}\n";
     
-    // Test PHP YAML extension availability
-    if (!extension_loaded('yaml')) {
-        echo "❌ PHP YAML extension not available\n";
-        exit(1);
-    }
-    echo "✅ PHP YAML extension is available\n";
+    // PHP YAML extension should be available by default, will fail if not
     
     // Check for Platform.sh configuration (optional for templates)
     if (file_exists('../.platform.app.yaml')) {

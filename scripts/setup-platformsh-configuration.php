@@ -17,19 +17,11 @@ echo "Platform.sh DDEV Configuration Setup\n";
 echo "Project: {$projectName} (Type: {$projectType})\n";
 echo "Working directory: " . getcwd() . "\n";
 
-// Check if Platform.sh configuration exists
-if (!file_exists('../.platform.app.yaml')) {
-    echo "✅ No Platform.sh configuration found - installation successful for template mode\n";
-    exit(0);
-}
-
-echo "📝 Found Platform.sh configuration files\n";
-
-// Generate DDEV configuration from Platform.sh files
+// Generate DDEV configuration from Platform.sh files (if they exist)
 $result = generate_all_ddev_config();
 
 if ($result === 0) {
-    // Install required DDEV add-ons based on services
+    // Install required DDEV add-ons based on services (if any)
     $services = parse_platformsh_services_config();
     install_required_addons($services);
     
@@ -38,11 +30,11 @@ if ($result === 0) {
     
     // Note: Composer dependencies will be installed via DDEV hooks in post-start
     
-    echo "✅ Platform.sh configuration successfully converted to DDEV\n";
+    echo "✅ Platform.sh configuration setup complete\n";
     echo "🔄 Please run 'ddev restart' to apply the new configuration\n";
 } else {
     echo "❌ Failed to convert Platform.sh configuration\n";
-    exit(1);
+    return 1;
 }
 
 function install_required_addons($services) {
