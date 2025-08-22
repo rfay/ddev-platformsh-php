@@ -66,28 +66,35 @@ jobs:
           set -eu -o pipefail
           
           # Get latest successful workflow run with artifacts for PHP addon PR
-          # For forked PRs, we need to find the workflow run in ddev/ddev that built the PR
           RUN_ID=""
           
-          # Try to find workflow runs for PR #7523 in ddev/ddev
+          # Get current commit SHA for PR #7523
           echo "Looking for workflow runs for PR #7523 in ddev/ddev..."
-          WORKFLOW_RUNS=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs?per_page=50" || echo '{"workflow_runs":[]}')
+          PR_SHA=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/pulls/7523" | jq -r '.head.sha')
+          echo "PR #7523 HEAD SHA: $PR_SHA"
           
-          # Look for runs that are from PR #7523 specifically
-          for run_id in $(echo "$WORKFLOW_RUNS" | jq -r '.workflow_runs[] | select(.conclusion=="success" and (.head_branch=="20250806_rfay_php_addon" or (.event=="pull_request" and .pull_requests[]?.number==7523))) | .id'); do
+          # Look for successful workflow runs with this commit SHA that have artifacts
+          WORKFLOW_RUNS=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs?head_sha=$PR_SHA&per_page=20" || echo '{"workflow_runs":[]}')
+          
+          for run_id in $(echo "$WORKFLOW_RUNS" | jq -r '.workflow_runs[] | select(.conclusion=="success") | .id'); do
             echo "Checking run $run_id for artifacts..."
             ARTIFACT_COUNT=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs/$run_id/artifacts" | jq '.total_count')
             echo "Artifact count for run $run_id: $ARTIFACT_COUNT"
             if [ "$ARTIFACT_COUNT" -gt 0 ]; then
-              RUN_ID=$run_id
-              break
+              # Verify this run has the ddev-linux-amd64 artifact we need
+              ARTIFACT_CHECK=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs/$run_id/artifacts" | jq -r '.artifacts[] | select(.name=="ddev-linux-amd64") | .id')
+              if [ -n "$ARTIFACT_CHECK" ] && [ "$ARTIFACT_CHECK" != "null" ]; then
+                RUN_ID=$run_id
+                echo "Found run $run_id with ddev-linux-amd64 artifact"
+                break
+              fi
             fi
           done
           
-          # Fallback to known working run if API fails
+          # Fail if no run with artifacts found
           if [ -z "$RUN_ID" ]; then
-            echo "WARNING: Could not find run with artifacts via API, using fallback"
-            RUN_ID="16806923996"
+            echo "ERROR: Could not find any successful workflow run with ddev-linux-amd64 artifact for PR #7523"
+            exit 1
           fi
           echo "Using run ID: $RUN_ID"
           
