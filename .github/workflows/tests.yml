@@ -27,8 +27,8 @@ jobs:
   tests:
     strategy:
       matrix:
-        # We don't even currently use any of the ddev_version, so limit to HEAD for now.
-        # TODO: Change back when ddev PR goes in.
+        # TODO: Change back when ddev is released
+        #ddev_version: [stable, HEAD]
         ddev_version: [HEAD]
         bats_file:
           - composerversion.bats
@@ -57,76 +57,3 @@ jobs:
           debug_enabled: ${{ github.event.inputs.debug_enabled }}
           addon_repository: ${{ env.GITHUB_REPOSITORY }}
           addon_ref: ${{ env.GITHUB_REF }}
-          test_command: true
-
-      # TODO: This build step is a temporary workaround to get the DDEV PR
-      # binary with PHP addon support.
-      - name: Install PR version PHP addon DDEV binary
-        run: |
-          set -eu -o pipefail
-          
-          # Get latest successful workflow run with artifacts for PHP addon PR
-          RUN_ID=""
-          
-          # Get current commit SHA for PR #7523
-          echo "Looking for workflow runs for PR #7523 in ddev/ddev..."
-          PR_SHA=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/pulls/7523" | jq -r '.head.sha')
-          echo "PR #7523 HEAD SHA: $PR_SHA"
-          
-          # Look for successful workflow runs with this commit SHA that have artifacts
-          WORKFLOW_RUNS=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs?head_sha=$PR_SHA&per_page=20" || echo '{"workflow_runs":[]}')
-          
-          for run_id in $(echo "$WORKFLOW_RUNS" | jq -r '.workflow_runs[] | select(.conclusion=="success") | .id'); do
-            echo "Checking run $run_id for artifacts..."
-            ARTIFACT_COUNT=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs/$run_id/artifacts" | jq '.total_count')
-            echo "Artifact count for run $run_id: $ARTIFACT_COUNT"
-            if [ "$ARTIFACT_COUNT" -gt 0 ]; then
-              # Verify this run has the ddev-linux-amd64 artifact we need
-              ARTIFACT_CHECK=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs/$run_id/artifacts" | jq -r '.artifacts[] | select(.name=="ddev-linux-amd64") | .id')
-              if [ -n "$ARTIFACT_CHECK" ] && [ "$ARTIFACT_CHECK" != "null" ]; then
-                RUN_ID=$run_id
-                echo "Found run $run_id with ddev-linux-amd64 artifact"
-                break
-              fi
-            fi
-          done
-          
-          # Fail if no run with artifacts found
-          if [ -z "$RUN_ID" ]; then
-            echo "ERROR: Could not find any successful workflow run with ddev-linux-amd64 artifact for PR #7523"
-            exit 1
-          fi
-          echo "Using run ID: $RUN_ID"
-          
-          # Get ddev-linux-amd64 artifact ID from the run
-          ARTIFACT_ID=$(curl -s --fail "https://api.github.com/repos/ddev/ddev/actions/runs/$RUN_ID/artifacts" | jq -r '.artifacts[] | select(.name=="ddev-linux-amd64") | .id')
-          echo "Artifact ID: $ARTIFACT_ID"
-          
-          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
-            echo "ERROR: Could not find ddev-linux-amd64 artifact"
-            exit 1
-          fi
-          
-          # Download and install PHP addon DDEV binary
-          DOWNLOAD_URL="https://nightly.link/ddev/ddev/actions/artifacts/$ARTIFACT_ID.zip"
-          echo "Downloading from: $DOWNLOAD_URL"
-          curl -sSL --fail "$DOWNLOAD_URL" -o ddev-php-addon.zip
-          unzip -q ddev-php-addon.zip
-          sudo cp ddev /usr/local/bin/ddev
-          sudo chmod +x /usr/local/bin/ddev
-          echo "Installed DDEV version:"
-          ddev --version
-
-      # Overwrite linuxbrew DDEV binary with PHP addon version
-      - name: Unlink ddev from homebrew
-        run: |
-          brew unlink ddev
-          hash -r
-          ddev --version
-
-      # Run bats tests with correct DDEV version
-      - name: Run bats tests with correct DDEV version
-        run: |
-          which -a ddev
-          ddev --version
-          bats tests/${{ matrix.bats_file }} --show-output-of-passing-tests --verbose-run
